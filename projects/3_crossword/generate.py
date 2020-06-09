@@ -116,7 +116,7 @@ class CrosswordCreator():
         False if no revision was made.
         """
         revised = False
-        
+        count = 0
         # find the constraints for (x,y)
         constraints = self.crossword.overlaps[x, y]
         if constraints is not None:
@@ -131,8 +131,9 @@ class CrosswordCreator():
                 # if no y_val in y domain satisfies this constraint then remove x_val from x domain
                 if not satisfied:
                     self.domains[x].remove(x_val)
+                    count += 1
                     revised = True
-        return revised
+        return revised, count
             
 
 
@@ -206,8 +207,6 @@ class CrosswordCreator():
                 except:
                     # do nothing
                     print("not assigned")
-                
-
         return True
 
     def order_domain_values(self, var, assignment):
@@ -219,7 +218,20 @@ class CrosswordCreator():
         """
         
         # return arbitrary ordering for now
-        return self.domains[var]
+        heuristic = dict()
+        for x_val in self.domains[var]:
+            n = 0
+            for y in self.crossword.neighbors(var):
+                if y not in assignment.keys():
+                    i, j = self.crossword.overlaps[var, y]
+                    for y_val in self.domains[y]:  
+                        if x_val[i] != y_val[j]:
+                            n += 1
+            heuristic[x_val] = n
+
+        heuristic = sorted(heuristic, key=heuristic.__getitem__)
+
+        return heuristic
 
 
     def select_unassigned_variable(self, assignment):
@@ -230,9 +242,13 @@ class CrosswordCreator():
         degree. If there is a tie, any of the tied variables are acceptable
         return values.
         """
+        # sort variables in ascending order of number of elements in the domain and then by highest amount of neighbors
+        domains_ascending = sorted(self.domains.items() ,  key=lambda x: (len(x[1]), -len(self.crossword.neighbors(x[0]))))
 
-        for var in self.domains.keys():
-            if var not in assignment.keys():
+        # Go through each variable and select the appropriate unassigned variable
+        for var, values in domains_ascending:
+            # Only choose unassigned variables
+            if var not in assignment.keys():                
                 return var
     
 
@@ -253,7 +269,7 @@ class CrosswordCreator():
         # Select an unassigned variable and assign a consistent value
         var = self.select_unassigned_variable(assignment)
         
-        
+        my_domains = self.order_domain_values(var, assignment)
         for value in self.domains[var]:
             # Try assigning value to var and see if its consistent
             assignment[var] = value
